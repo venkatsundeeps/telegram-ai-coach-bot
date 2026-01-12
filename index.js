@@ -57,8 +57,15 @@ app.post("/webhook", async (req, res) => {
     const chatId = message.chat.id;
     const userText = message.text.trim();
 
-    // Ignore very short messages
+    // Reply with instructions for very short messages
     if (userText.split(" ").length < 3) {
+      await axios.post(
+        `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`,
+        {
+          chat_id: chatId,
+          text: "Hi! Please send a message with at least 3 words so I can help you as your AI coach. For example: 'How do I improve focus?'",
+        }
+      );
       return res.sendStatus(200);
     }
 
