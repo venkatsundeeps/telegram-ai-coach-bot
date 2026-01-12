@@ -20,9 +20,12 @@ app.get("/", (req, res) => {
  * Telegram Webhook
  */
 app.post("/webhook", async (req, res) => {
+  console.log("===== WEBHOOK HIT 1=====");
+  console.log(JSON.stringify(req.body, null, 2));
   try {
     const message = req.body.message;
-
+    console.log("===== WEBHOOK HIT =====");
+    console.log(JSON.stringify(req.body, null, 2));
     // Ignore non-text messages
     if (!message || !message.text) {
       return res.sendStatus(200);
@@ -39,23 +42,23 @@ app.post("/webhook", async (req, res) => {
     console.log("Received:", userText);
 
     // Call AI (OpenAI example)
-    const aiResponse = await axios.post(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        model: "gpt-4.1-mini",
-        messages: [
-          { role: "system", content: prompt },
-          { role: "user", content: userText },
-        ],
-        temperature: 0.4,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.AI_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    // const aiResponse = await axios.post(
+    //   "https://api.openai.com/v1/chat/completions",
+    //   {
+    //     model: "gpt-4.1-mini",
+    //     messages: [
+    //       { role: "system", content: prompt },
+    //       { role: "user", content: userText },
+    //     ],
+    //     temperature: 0.4,
+    //   },
+    //   {
+    //     headers: {
+    //       Authorization: `Bearer ${process.env.AI_API_KEY}`,
+    //       "Content-Type": "application/json",
+    //     },
+    //   }
+    // );
 
     const replyText =
       aiResponse.data.choices[0].message.content ||
