@@ -1,6 +1,6 @@
 /**
- * Telegram AI Coach Bot
- * Stateless, privacy-safe webhook server
+ * Telegram → Gemini → Reply
+ * Stateless, production-safe
  */
 
 require("dotenv").config();
@@ -11,21 +11,44 @@ const prompt = require("./prompt");
 const app = express();
 app.use(express.json());
 
-// Health check (important for Render)
+/* ---------- Health check ---------- */
 app.get("/", (req, res) => {
-  res.send("Telegram AI Coach Bot is running");
+  res.send("Telegram AI Coach Bot running");
 });
 
-/**
- * Telegram Webhook
- */
+/* ---------- Gemini REST helper ---------- */
+const GEMINI_ENDPOINT =
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+
+async function callGemini(finalPrompt) {
+  const response = await axios.post(
+    `${GEMINI_ENDPOINT}?key=${process.env.AI_API_KEY}`,
+    {
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: finalPrompt }],
+        },
+      ],
+    },
+    {
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  return (
+    response.data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+    "Unable to generate response."
+  );
+}
+
+/* ---------- Telegram Webhook ---------- */
 app.post("/webhook", async (req, res) => {
-  console.log("===== WEBHOOK HIT 1=====");
-  console.log(JSON.stringify(req.body, null, 2));
   try {
     const message = req.body.message;
-    console.log("===== WEBHOOK HIT =====");
-    console.log(JSON.stringify(req.body, null, 2));
+
     // Ignore non-text messages
     if (!message || !message.text) {
       return res.sendStatus(200);
@@ -34,53 +57,37 @@ app.post("/webhook", async (req, res) => {
     const chatId = message.chat.id;
     const userText = message.text.trim();
 
-    // Ignore very short messages (noise)
+    // Ignore very short messages
     if (userText.split(" ").length < 3) {
       return res.sendStatus(200);
     }
 
     console.log("Received:", userText);
 
-    // Call AI (OpenAI example)
-    // const aiResponse = await axios.post(
-    //   "https://api.openai.com/v1/chat/completions",
-    //   {
-    //     model: "gpt-4.1-mini",
-    //     messages: [
-    //       { role: "system", content: prompt },
-    //       { role: "user", content: userText },
-    //     ],
-    //     temperature: 0.4,
-    //   },
-    //   {
-    //     headers: {
-    //       Authorization: `Bearer ${process.env.AI_API_KEY}`,
-    //       "Content-Type": "application/json",
-    //     },
-    //   }
-    // );
+    const finalPrompt = `${prompt}
 
-    const replyText =
-      aiResponse.data.choices[0].message.content ||
-      "Unable to generate response right now.";
+Coach message:
+${userText}
+`;
 
-    // Send reply back to Telegram
+    const aiReply = await callGemini(finalPrompt);
+
     await axios.post(
       `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`,
       {
         chat_id: chatId,
-        text: replyText,
+        text: aiReply,
       }
     );
 
     res.sendStatus(200);
-  } catch (error) {
-    console.error("Webhook error:", error.message);
-    res.sendStatus(200); // always acknowledge Telegram
+  } catch (err) {
+    console.error("Webhook error:", err.response?.data || err.message);
+    res.sendStatus(200); // Always acknowledge Telegram
   }
 });
 
-// REQUIRED for Render
+/* ---------- Start server (Render compatible) ---------- */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`Server running on port ${PORT}`);
